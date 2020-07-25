@@ -1,7 +1,15 @@
 document.addEventListener('selectionchange', function() {
-    var selection = window.getSelection().toString().trim();
     chrome.runtime.sendMessage({
-        request: 'onSelectionChange',
-        selection: selection
+        request: 'onContextChange',
+        selection: grabSelection()
     });
 });
+
+function grabSelection(){
+    return window.getSelection().toString().trim();
+}
+
+chrome.runtime.onMessage.addListener(function(msg, sender, callback){
+    if (msg.request === 'onTabActivated')
+        callback({ selection: grabSelection() });
+})
