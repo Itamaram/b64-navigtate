@@ -1,16 +1,3 @@
-////
-//Base64 encoding - If url, navigate b64root
-//  -Copy encoded to clipboard b64encode
-//  -Copy decoded to clipboard b64decode
-
-// ID to manage the context menu entry
-var cmid;
-var cm_clickHandler = function (data) {
-    chrome.tabs.create({
-        url: Base64.decode(data.selectionText)
-    })
-};
-
 function isUrl(s) {
     return !!new RegExp('^https?:\\/\\/').test(s)
 }
@@ -19,6 +6,9 @@ var Base64 = { _keyStr: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012
 
 var cm = {
     contexts: ['selection'],
+    navigate: {
+        id: 'b64navigate'
+    },
     root: {
         id: 'b64root',
         title: 'B64 (en|de)code',
@@ -36,10 +26,16 @@ var cm = {
 }
 
 chrome.contextMenus.create({
+    id: cm.navigate.id,
+    title: '<placeholder>',
+    contexts: cm.contexts,
+    visible: false,
+});
+
+chrome.contextMenus.create({
     id: cm.root.id,
     title: cm.root.title,
     contexts: cm.contexts,
-    visible: false,
 }, function () {
     [cm.decode, cm.encode].forEach(function (child) {
         chrome.contextMenus.create({
@@ -47,50 +43,44 @@ chrome.contextMenus.create({
             title: child.title,
             contexts: cm.contexts,
             parentId: cm.root.id,
-            visible: false,
         });
     });
 });
 
 function updateChildMenus(selection) {
-    var visible = !!selection;
     [cm.decode, cm.encode].forEach(function (child) {
         var b64 = child.action(selection);
         chrome.contextMenus.update(child.id, {
-            visible: visible,
             title: child.title + b64,
-            onclick: function () {
-                chrome.tabs.getCurrent(function(tab){
-                    chrome.tabs.sendMessage(tab.tabId, {
-                        request: 'copyToClipboard',
-                        text: b64,
-                    })
-                });
-            }
+            onclick: function () { copyTextToClipboard(b64); }
         });
     });
 }
 
 function updateContextMenu(selection) {
     if (!selection) {
-        chrome.contextMenus.update(cm.root.id, { visible: false, })
+        [cm.root, cm.navigate].forEach(function (x) {
+            chrome.contextMenus.update(x.id, { visible: false, })
+        })
         return;
     }
 
     var decoded = Base64.decode(selection);
 
     var options = {
-        visible: true,
-        title: cm.root.title,
-        onclick: null, // todo test this works
+        visible: false,
     };
 
     if (isUrl(decoded)) {
         options.title = 'Go to ' + decoded;
+        options.visible = true;
         options.onclick = function () { chrome.tabs.create({ url: decoded }); };
     }
 
-    chrome.contextMenus.update(cm.root.id, options, function () { updateChildMenus(selection); });
+    chrome.contextMenus.update(cm.navigate.id, options);
+    chrome.contextMenus.update(cm.root.id, { visible: true }, function () {
+        updateChildMenus(selection);
+    });
 }
 
 chrome.runtime.onMessage.addListener(function (msg) {
@@ -103,4 +93,15 @@ chrome.tabs.onActivated.addListener(function (info) {
         if (response !== undefined)
             updateContextMenu(response.selection);
     });
+})
+
+function copyTextToClipboard(text) {
+    var e = document.getElementById('container');
+    e.textContent = text;
+    e.select();
+    document.execCommand('copy');
+}
+
+chrome.contextMenus.onClicked.addListener(function (info, tab) {
+    console.log(info);
 })
