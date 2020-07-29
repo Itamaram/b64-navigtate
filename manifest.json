@@ -3,7 +3,6 @@
   "version": "0.1",
   "permissions": [
     "contextMenus",
-    "tabs",
     "clipboardWrite"
   ],
   "content_scripts": [
